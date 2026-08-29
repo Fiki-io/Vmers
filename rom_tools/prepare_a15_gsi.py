@@ -39,8 +39,10 @@ def unpack_gsi(input_img, work_dir):
     os.makedirs(rootfs_dir, exist_ok=True)
     
     log(f"Extracting {img_to_extract} to {rootfs_dir} via 7z...")
-    subprocess.check_call(['7z', 'x', '-y', img_to_extract, f"-o{rootfs_dir}"])
-    
+    proc = subprocess.run(['7z', 'x', '-y', '-snl', img_to_extract, f"-o{rootfs_dir}"], capture_output=True)
+    if proc.returncode not in (0, 1, 2):
+        raise RuntimeError(f"7z extraction failed with code {proc.returncode}: {proc.stderr.decode('utf-8', errors='ignore')}")
+    log("7z extraction completed.")
     if os.path.exists(raw_img) and raw_img != input_img:
         os.remove(raw_img)
         
@@ -170,7 +172,7 @@ def package_rom(rootfs_dir, output_path, rom_meta):
     if os.path.exists(output_path):
         os.remove(output_path)
 
-    cmd = ['7z', 'a', '-t7z', '-mx=5', output_path, '.']
+    cmd = ['7z', 'a', '-t7z', '-mx=1', output_path, '.']
     subprocess.check_call(cmd, cwd=rootfs_dir)
     log(f"ROM package created successfully: {output_path} ({os.path.getsize(output_path) / 1024 / 1024:.2f} MB)")
 
