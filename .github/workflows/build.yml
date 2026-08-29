@@ -8,33 +8,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-core-engine:
-    name: Build Native ARM64 Engine
+  build-and-deploy:
+    name: Build Vmers Core Engine & Android Host App
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Install Toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu p7zip-full
-
-      - name: Compile Native Core Engine
-        run: |
-          cd core_engine
-          make arm64 host
-
-      - name: Upload Core Engine Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: vmers-core-engine-arm64
-          path: core_engine/vmers_engine_arm64
-
-  build-android-app:
-    name: Build Android Host Application (Vmers.apk)
-    runs-on: ubuntu-latest
-    needs: build-core-engine
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -45,27 +21,66 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Install Native ARM64 Cross-Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu p7zip-full curl jq
+
+      - name: Compile Native C++ Container Engine & Shim
+        run: |
+          cd core_engine
+          make arm64 host
+          ls -lh vmers_engine_arm64 libvmlink_shim_arm64.so
+
+      - name: Bundle Native Binaries to App Assets
+        run: |
+          mkdir -p host_app/app/src/main/assets/bin
+          cp core_engine/vmers_engine_arm64 host_app/app/src/main/assets/bin/vmers_engine
+          cp core_engine/libvmlink_shim_arm64.so host_app/app/src/main/assets/bin/libvmlink_shim.so
+
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26b
 
-      - name: Grant Execute Permission for Gradlew
+      - name: Build Android APK (Release & Debug)
         run: |
           cd host_app
-          chmod +x gradlew || true
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
 
-      - name: Build Android APK
-        run: |
-          cd host_app
-          if [ -f gradlew ]; then
-            ./gradlew assembleDebug --stacktrace
-          else
-            gradle assembleDebug --stacktrace || true
-          fi
-
-      - name: Upload APK Artifact
+      - name: Upload Artifacts to GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: Vmers-Debug-APK
-          path: host_app/app/build/outputs/apk/debug/*.apk
+          name: Vmers-Artifacts
+          path: |
+            host_app/app/build/outputs/apk/debug/*.apk
+            core_engine/vmers_engine_arm64
+            core_engine/libvmlink_shim_arm64.so
+
+      - name: Auto-Upload Built APK & Engine to GoFile
+        run: |
+          echo "### 🚀 Vmers Build & GoFile Downloads" >> $GITHUB_STEP_SUMMARY
+          
+          # Get best GoFile server
+          SERVER=$(curl -s https://api.gofile.io/servers | jq -r '.data.servers[0].name // "store1"')
+          echo "Using GoFile server: $SERVER"
+
+          # Upload APK
+          APK_PATH=$(find host_app/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          if [ -f "$APK_PATH" ]; then
+            echo "Uploading APK ($APK_PATH) to GoFile..."
+            RES_APK=$(curl -s -F "file=@$APK_PATH" "https://${SERVER}.gofile.io/contents/uploadfile")
+            APK_LINK=$(echo "$RES_APK" | jq -r '.data.downloadPage // "Upload failed"')
+            echo "- 📱 **Android APK Download (GoFile)**: [$APK_LINK]($APK_LINK)" >> $GITHUB_STEP_SUMMARY
+            echo "APK GoFile URL: $APK_LINK"
+          fi
+
+          # Upload ARM64 Engine
+          if [ -f "core_engine/vmers_engine_arm64" ]; then
+            echo "Uploading Engine Binary to GoFile..."
+            RES_ENG=$(curl -s -F "file=@core_engine/vmers_engine_arm64" "https://${SERVER}.gofile.io/contents/uploadfile")
+            ENG_LINK=$(echo "$RES_ENG" | jq -r '.data.downloadPage // "Upload failed"')
+            echo "- ⚙️ **ARM64 Native Engine Download (GoFile)**: [$ENG_LINK]($ENG_LINK)" >> $GITHUB_STEP_SUMMARY
+            echo "Engine GoFile URL: $ENG_LINK"
+          fi
