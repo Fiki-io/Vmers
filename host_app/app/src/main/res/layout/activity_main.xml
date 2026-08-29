@@ -69,6 +69,16 @@
 
     </LinearLayout>
 
+    <!-- ROM Import & Management -->
+    <Button
+        android:id="@+id/btn_import_rom"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Import &amp; Install ROM (.7z)"
+        android:backgroundTint="@color/card_dark"
+        android:textColor="@color/text_white"
+        android:layout_marginBottom="12dp" />
+
     <!-- Controls -->
     <Button
         android:id="@+id/btn_vm_settings"

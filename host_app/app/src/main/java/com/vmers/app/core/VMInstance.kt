@@ -3,6 +3,7 @@ package com.vmers.app.core
 import android.content.Context
 import android.util.Log
 import java.io.File
+import java.io.FileOutputStream
 
 class VMInstance(
     val context: Context,
@@ -24,11 +25,36 @@ class VMInstance(
     init {
         vmBaseDir.mkdirs()
         rootfsDir.mkdirs()
+        extractEngineBinaries()
+    }
+
+    private fun extractEngineBinaries() {
+        val binDir = File(context.filesDir, "bin")
+        binDir.mkdirs()
+
+        val files = listOf("vmers_engine", "libvmlink_shim.so")
+        for (f in files) {
+            val dest = File(binDir, f)
+            if (!dest.exists() || dest.length() == 0L) {
+                try {
+                    context.assets.open("bin/$f").use { input ->
+                        FileOutputStream(dest).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    dest.setExecutable(true, false)
+                    dest.setReadable(true, false)
+                    Log.i(TAG, "Extracted native asset: $f -> ${dest.absolutePath}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not extract asset bin/$f: ${e.message}")
+                }
+            }
+        }
     }
 
     fun isInstalled(): Boolean {
         val appProcess = File(rootfsDir, "system/bin/app_process64")
-        return appProcess.exists() && appProcess.canExecute()
+        return appProcess.exists()
     }
 
     fun startVM(): Boolean {
@@ -45,7 +71,9 @@ class VMInstance(
         )
 
         // Locate engine binary
-        val engineBin = File(context.applicationInfo.nativeLibraryDir, "libvmers_engine.so")
+        val binDir = File(context.filesDir, "bin")
+        val engineBin = File(binDir, "vmers_engine")
+        val shimLib = File(binDir, "libvmlink_shim.so")
         val execPath = if (engineBin.exists()) engineBin.absolutePath else "/data/local/tmp/vmers_engine"
 
         try {
@@ -53,8 +81,12 @@ class VMInstance(
             pb.directory(rootfsDir)
             pb.redirectErrorStream(true)
             
-            // Environment variables
+            // Environment variables for guest container isolation
             val env = pb.environment()
+            env["VMERS_ROOTFS"] = rootfsDir.absolutePath
+            if (shimLib.exists()) {
+                env["LD_PRELOAD"] = shimLib.absolutePath
+            }
             env["ANDROID_ROOT"] = "/system"
             env["ANDROID_DATA"] = "/data"
             env["ANDROID_ART_ROOT"] = "/apex/com.android.art"
