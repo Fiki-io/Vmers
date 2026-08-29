@@ -90,6 +90,15 @@ class FloatingWindowService : Service() {
             }
         })
 
+        ball.setOnLongClickListener {
+            val intent = Intent(this@FloatingWindowService, com.vmers.app.ui.LogcatActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            Toast.makeText(this, "Opening Live Logcat Debugger...", Toast.LENGTH_SHORT).show()
+            true
+        }
+
         floatingView = ball
         try {
             windowManager?.addView(floatingView, params)

@@ -92,12 +92,26 @@ class VMInstance(
             env["ANDROID_ART_ROOT"] = "/apex/com.android.art"
             env["BOOTCLASSPATH"] = "/apex/com.android.art/javalib/core-oj.jar:/system/framework/framework.jar"
 
-            vmProcess = pb.start()
+            val process = pb.start()
+            vmProcess = process
             isRunning = true
             Log.i(TAG, "VM Instance ${config.id} booted successfully.")
+
+            // Stream container stdout/stderr to LogcatManager
+            kotlin.concurrent.thread(name = "VM-Log-Reader", isDaemon = true) {
+                try {
+                    val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        line?.let { com.vmers.app.debug.LogcatManager.logEngineOutput(it) }
+                    }
+                } catch (ignored: Exception) {
+                }
+            }
+
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start VM Instance: ${e.message}", e)
+            com.vmers.app.debug.LogcatManager.logError(TAG, "Failed to start VM Instance: ${e.message}", e)
             isRunning = false
             return false
         }

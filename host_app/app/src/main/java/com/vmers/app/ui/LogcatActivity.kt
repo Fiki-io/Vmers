@@ -1,0 +1,182 @@
+package com.vmers.app.ui
+
+import android.content.Intent
+import android.graphics.Color
+import android.net.Uri
+import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.EditText
+import android.widget.Spinner
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.vmers.app.R
+import com.vmers.app.debug.LogEntry
+import com.vmers.app.debug.LogLevel
+import com.vmers.app.debug.LogcatManager
+
+class LogcatActivity : AppCompatActivity() {
+
+    private lateinit var rvLogcat: RecyclerView
+    private lateinit var etSearch: EditText
+    private lateinit var spinnerLevel: Spinner
+    private lateinit var btnClear: Button
+    private lateinit var btnExport: Button
+
+    private val adapter = LogAdapter()
+    private var currentFilterLevel = "ALL"
+    private var searchQuery = ""
+
+    private val logListener: (LogEntry) -> Unit = {
+        runOnUiThread {
+            refreshFilteredList()
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_logcat)
+
+        rvLogcat = findViewById(R.id.rv_logcat)
+        etSearch = findViewById(R.id.et_search_log)
+        spinnerLevel = findViewById(R.id.spinner_log_level)
+        btnClear = findViewById(R.id.btn_clear_logs)
+        btnExport = findViewById(R.id.btn_export_logs)
+
+        val layoutManager = LinearLayoutManager(this)
+        layoutManager.stackFromEnd = true
+        rvLogcat.layoutManager = layoutManager
+        rvLogcat.adapter = adapter
+
+        setupSpinner()
+        setupListeners()
+        refreshFilteredList()
+
+        LogcatManager.addListener(logListener)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        LogcatManager.removeListener(logListener)
+    }
+
+    private fun setupSpinner() {
+        val levels = arrayOf("ALL", "FATAL / SIGSEGV", "ERROR", "WARN", "INFO")
+        val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, levels)
+        spinnerLevel.adapter = spinnerAdapter
+        spinnerLevel.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                currentFilterLevel = levels[position]
+                refreshFilteredList()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    private fun setupListeners() {
+        etSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                searchQuery = s?.toString()?.trim() ?: ""
+                refreshFilteredList()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        btnClear.setOnClickListener {
+            LogcatManager.clearLogs()
+            refreshFilteredList()
+        }
+
+        btnExport.setOnClickListener {
+            val file = LogcatManager.exportLogsToFile(this)
+            Toast.makeText(this, "Log diekspor ke: ${file.name}", Toast.LENGTH_LONG).show()
+
+            try {
+                val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(Intent.createChooser(shareIntent, "Share Logcat Dump"))
+            } catch (e: Exception) {
+                Toast.makeText(this, "File tersimpan di: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun refreshFilteredList() {
+        val allLogs = LogcatManager.getLogs()
+        val filtered = allLogs.filter { entry ->
+            val matchLevel = when (currentFilterLevel) {
+                "FATAL / SIGSEGV" -> entry.level == LogLevel.FATAL || entry.raw.contains("SIGSEGV", true) || entry.raw.contains("Signal 11", true)
+                "ERROR" -> entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL
+                "WARN" -> entry.level == LogLevel.WARN || entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL
+                "INFO" -> entry.level != LogLevel.DEBUG && entry.level != LogLevel.VERBOSE
+                else -> true
+            }
+
+            val matchSearch = if (searchQuery.isEmpty()) true else entry.raw.contains(searchQuery, ignoreCase = true)
+            matchLevel && matchSearch
+        }
+
+        adapter.setItems(filtered)
+        if (filtered.isNotEmpty()) {
+            rvLogcat.scrollToPosition(filtered.size - 1)
+        }
+    }
+
+    private class LogAdapter : RecyclerView.Adapter<LogViewHolder>() {
+        private var items = listOf<LogEntry>()
+
+        fun setItems(newItems: List<LogEntry>) {
+            items = newItems
+            notifyDataSetChanged()
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): LogViewHolder {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_logcat_line, parent, false)
+            return LogViewHolder(view as TextView)
+        }
+
+        override fun onBindViewHolder(holder: LogViewHolder, position: Int) {
+            holder.bind(items[position])
+        }
+
+        override fun getItemCount(): Int = items.size
+    }
+
+    private class LogViewHolder(val tv: TextView) : RecyclerView.ViewHolder(tv) {
+        fun bind(entry: LogEntry) {
+            tv.text = "[${entry.timestamp}] [${entry.tag}] ${entry.message}"
+            when {
+                entry.level == LogLevel.FATAL || entry.raw.contains("SIGSEGV", true) || entry.raw.contains("Signal 11", true) -> {
+                    tv.setTextColor(Color.parseColor("#FF4757")) // Bright Red
+                }
+                entry.level == LogLevel.ERROR || entry.raw.contains("denied", true) || entry.raw.contains("error", true) -> {
+                    tv.setTextColor(Color.parseColor("#FFA502")) // Orange/Red
+                }
+                entry.level == LogLevel.WARN || entry.raw.contains("avc:", true) -> {
+                    tv.setTextColor(Color.parseColor("#ECCC68")) // Yellow
+                }
+                entry.tag == "CONTAINER" -> {
+                    tv.setTextColor(Color.parseColor("#70A1FF")) // Sky Blue
+                }
+                else -> {
+                    tv.setTextColor(Color.parseColor("#A4B0BE")) // Gray/White
+                }
+            }
+        }
+    }
+}

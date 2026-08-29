@@ -73,6 +73,10 @@ class MainActivity : AppCompatActivity() {
         btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
+
+        findViewById<Button>(R.id.btn_open_logcat).setOnClickListener {
+            startActivity(Intent(this, LogcatActivity::class.java))
+        }
     }
 
     private fun handleImportRomUri(uri: Uri) {

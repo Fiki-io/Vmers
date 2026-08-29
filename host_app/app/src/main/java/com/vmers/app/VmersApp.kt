@@ -17,6 +17,7 @@ class VmersApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        com.vmers.app.debug.CrashHandler.init(this)
         createNotificationChannel()
         VMManager.initialize(this)
     }
