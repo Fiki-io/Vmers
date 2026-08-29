@@ -47,7 +47,7 @@ object LogcatManager {
             try {
                 val process = Runtime.getRuntime().exec("logcat -v time *:V")
                 val reader = BufferedReader(InputStreamReader(process.inputStream))
-                var line: String?
+                var line: String? = null
                 while (isCapturing && reader.readLine().also { line = it } != null) {
                     line?.let { parseAndAddLog("SYS", it) }
                 }

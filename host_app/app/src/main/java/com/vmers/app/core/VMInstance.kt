@@ -101,7 +101,7 @@ class VMInstance(
             kotlin.concurrent.thread(name = "VM-Log-Reader", isDaemon = true) {
                 try {
                     val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
-                    var line: String?
+                    var line: String? = null
                     while (reader.readLine().also { line = it } != null) {
                         line?.let { com.vmers.app.debug.LogcatManager.logEngineOutput(it) }
                     }
