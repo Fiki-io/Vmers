@@ -20,6 +20,12 @@ add_library(
     native_bridge.cpp
 )
 
+target_include_directories(
+    vmers_jni
+    PRIVATE
+    ../../../../../core_engine
+)
+
 target_link_libraries(
     vmers_jni
     ${log-lib}
