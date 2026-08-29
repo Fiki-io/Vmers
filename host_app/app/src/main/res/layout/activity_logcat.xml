@@ -1,24 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/logcat_root_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0F1015"
+    android:fitsSystemWindows="true"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="16dp"
+    android:paddingBottom="12dp">
 
-    <!-- Top Action Bar -->
+    <!-- Top Action Bar with proper touch targets -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:layout_marginBottom="8dp">
+        android:layout_marginBottom="12dp">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Debugger &amp; Crash Terminal"
+            android:text="Debugger &amp; Logs"
             android:textColor="#00CEC9"
             android:textSize="18sp"
             android:textStyle="bold" />
@@ -26,32 +31,38 @@
         <Button
             android:id="@+id/btn_copy_logs"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="42dp"
             android:text="Copy"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:backgroundTint="#00CEC9"
             android:textColor="#000000"
             android:textStyle="bold"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
             android:layout_marginEnd="6dp" />
 
         <Button
             android:id="@+id/btn_clear_logs"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="42dp"
             android:text="Clear"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:backgroundTint="#2D3436"
             android:textColor="#FFFFFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:layout_marginEnd="6dp" />
 
         <Button
             android:id="@+id/btn_export_logs"
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
+            android:layout_height="42dp"
             android:text="Export"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:backgroundTint="#6C5CE7"
-            android:textColor="#FFFFFF" />
+            android:textColor="#FFFFFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
 
     </LinearLayout>
 
@@ -60,17 +71,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginBottom="8dp">
+        android:layout_marginBottom="10dp">
 
         <EditText
             android:id="@+id/et_search_log"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="44dp"
             android:layout_weight="1"
             android:background="#1A1C23"
             android:hint="Search errors, SIGSEGV, denied, avc..."
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:textColor="#FFFFFF"
             android:textColorHint="#636E72"
             android:textSize="13sp"
@@ -78,8 +89,8 @@
 
         <Spinner
             android:id="@+id/spinner_log_level"
-            android:layout_width="110dp"
-            android:layout_height="40dp"
+            android:layout_width="120dp"
+            android:layout_height="44dp"
             android:background="#2D3436" />
 
     </LinearLayout>
@@ -91,6 +102,6 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:background="#08090C"
-        android:padding="4dp" />
+        android:padding="6dp" />
 
 </LinearLayout>

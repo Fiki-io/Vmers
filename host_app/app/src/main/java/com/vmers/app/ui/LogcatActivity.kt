@@ -21,6 +21,8 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.vmers.app.R
@@ -40,16 +42,30 @@ class LogcatActivity : AppCompatActivity() {
     private val adapter = LogAdapter()
     private var currentFilterLevel = "ALL"
     private var searchQuery = ""
+    private var isFirstLoad = true
 
     private val logListener: (LogEntry) -> Unit = {
         runOnUiThread {
-            refreshFilteredList()
+            refreshFilteredList(autoScroll = false)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_logcat)
+
+        // Handle System Window Insets to avoid status bar overlap
+        val rootLayout = findViewById<View>(R.id.logcat_root_layout)
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { view, insets ->
+            val statusBarInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                statusBarInsets.left + 16,
+                statusBarInsets.top + 16,
+                statusBarInsets.right + 16,
+                statusBarInsets.bottom + 12
+            )
+            insets
+        }
 
         rvLogcat = findViewById(R.id.rv_logcat)
         etSearch = findViewById(R.id.et_search_log)
@@ -59,13 +75,12 @@ class LogcatActivity : AppCompatActivity() {
         btnExport = findViewById(R.id.btn_export_logs)
 
         val layoutManager = LinearLayoutManager(this)
-        layoutManager.stackFromEnd = true
         rvLogcat.layoutManager = layoutManager
         rvLogcat.adapter = adapter
 
         setupSpinner()
         setupListeners()
-        refreshFilteredList()
+        refreshFilteredList(autoScroll = true)
 
         LogcatManager.addListener(logListener)
     }
@@ -76,13 +91,13 @@ class LogcatActivity : AppCompatActivity() {
     }
 
     private fun setupSpinner() {
-        val levels = arrayOf("ALL", "💥 CRASH / SIGSEGV", "❌ ERROR / FAILED", "⚠️ WARN / DENIED", "ℹ️ INFO")
+        val levels = arrayOf("ALL", "💥 CRASH / SIGNAL 11", "❌ ERROR / FAILED", "⚠️ WARN / DENIED", "ℹ️ INFO")
         val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, levels)
         spinnerLevel.adapter = spinnerAdapter
         spinnerLevel.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 currentFilterLevel = levels[position]
-                refreshFilteredList()
+                refreshFilteredList(autoScroll = false)
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
@@ -93,7 +108,7 @@ class LogcatActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 searchQuery = s?.toString()?.trim() ?: ""
-                refreshFilteredList()
+                refreshFilteredList(autoScroll = false)
             }
             override fun afterTextChanged(s: Editable?) {}
         })
@@ -112,7 +127,7 @@ class LogcatActivity : AppCompatActivity() {
 
         btnClear.setOnClickListener {
             LogcatManager.clearLogs()
-            refreshFilteredList()
+            refreshFilteredList(autoScroll = false)
             Toast.makeText(this, "Log permanen telah dibersihkan.", Toast.LENGTH_SHORT).show()
         }
 
@@ -132,7 +147,7 @@ class LogcatActivity : AppCompatActivity() {
         }
     }
 
-    private fun refreshFilteredList() {
+    private fun refreshFilteredList(autoScroll: Boolean) {
         val allLogs = LogcatManager.getLogs()
         val filtered = allLogs.filter { entry ->
             val matchLevel = when {
@@ -148,8 +163,11 @@ class LogcatActivity : AppCompatActivity() {
         }
 
         adapter.setItems(filtered)
-        if (filtered.isNotEmpty()) {
-            rvLogcat.scrollToPosition(filtered.size - 1)
+        if (autoScroll || isFirstLoad) {
+            if (filtered.isNotEmpty()) {
+                rvLogcat.scrollToPosition(filtered.size - 1)
+            }
+            isFirstLoad = false
         }
     }
 
