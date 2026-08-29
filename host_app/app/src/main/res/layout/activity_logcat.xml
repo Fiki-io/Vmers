@@ -24,6 +24,17 @@
             android:textStyle="bold" />
 
         <Button
+            android:id="@+id/btn_copy_logs"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Copy"
+            android:textSize="12sp"
+            android:backgroundTint="#00CEC9"
+            android:textColor="#000000"
+            android:textStyle="bold"
+            android:layout_marginEnd="6dp" />
+
+        <Button
             android:id="@+id/btn_clear_logs"
             android:layout_width="wrap_content"
             android:layout_height="36dp"

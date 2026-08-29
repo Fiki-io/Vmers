@@ -53,8 +53,10 @@ class VMInstance(
     }
 
     fun isInstalled(): Boolean {
+        val marker = File(rootfsDir, ".vmers_installed")
+        val buildProp = File(rootfsDir, "system/build.prop")
         val appProcess = File(rootfsDir, "system/bin/app_process64")
-        return appProcess.exists()
+        return marker.exists() || buildProp.exists() || appProcess.exists()
     }
 
     fun startVM(): Boolean {

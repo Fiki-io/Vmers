@@ -1,5 +1,8 @@
 package com.vmers.app.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -30,6 +33,7 @@ class LogcatActivity : AppCompatActivity() {
     private lateinit var rvLogcat: RecyclerView
     private lateinit var etSearch: EditText
     private lateinit var spinnerLevel: Spinner
+    private lateinit var btnCopy: Button
     private lateinit var btnClear: Button
     private lateinit var btnExport: Button
 
@@ -50,6 +54,7 @@ class LogcatActivity : AppCompatActivity() {
         rvLogcat = findViewById(R.id.rv_logcat)
         etSearch = findViewById(R.id.et_search_log)
         spinnerLevel = findViewById(R.id.spinner_log_level)
+        btnCopy = findViewById(R.id.btn_copy_logs)
         btnClear = findViewById(R.id.btn_clear_logs)
         btnExport = findViewById(R.id.btn_export_logs)
 
@@ -71,7 +76,7 @@ class LogcatActivity : AppCompatActivity() {
     }
 
     private fun setupSpinner() {
-        val levels = arrayOf("ALL", "FATAL / SIGSEGV", "ERROR", "WARN", "INFO")
+        val levels = arrayOf("ALL", "💥 CRASH / SIGSEGV", "❌ ERROR / FAILED", "⚠️ WARN / DENIED", "ℹ️ INFO")
         val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, levels)
         spinnerLevel.adapter = spinnerAdapter
         spinnerLevel.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
@@ -93,15 +98,26 @@ class LogcatActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {}
         })
 
+        btnCopy.setOnClickListener {
+            val allText = LogcatManager.getAllLogsText()
+            if (allText.isEmpty()) {
+                Toast.makeText(this, "Log masih kosong.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("Vmers Debug Logs", allText)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(this, "Semua log berhasil disalin ke Clipboard!", Toast.LENGTH_SHORT).show()
+        }
+
         btnClear.setOnClickListener {
             LogcatManager.clearLogs()
             refreshFilteredList()
+            Toast.makeText(this, "Log permanen telah dibersihkan.", Toast.LENGTH_SHORT).show()
         }
 
         btnExport.setOnClickListener {
-            val file = LogcatManager.exportLogsToFile(this)
-            Toast.makeText(this, "Log diekspor ke: ${file.name}", Toast.LENGTH_LONG).show()
-
+            val file = LogcatManager.getExportFile(this)
             try {
                 val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -119,11 +135,11 @@ class LogcatActivity : AppCompatActivity() {
     private fun refreshFilteredList() {
         val allLogs = LogcatManager.getLogs()
         val filtered = allLogs.filter { entry ->
-            val matchLevel = when (currentFilterLevel) {
-                "FATAL / SIGSEGV" -> entry.level == LogLevel.FATAL || entry.raw.contains("SIGSEGV", true) || entry.raw.contains("Signal 11", true)
-                "ERROR" -> entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL
-                "WARN" -> entry.level == LogLevel.WARN || entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL
-                "INFO" -> entry.level != LogLevel.DEBUG && entry.level != LogLevel.VERBOSE
+            val matchLevel = when {
+                currentFilterLevel.contains("CRASH") -> entry.level == LogLevel.FATAL || entry.raw.contains("SIGSEGV", true) || entry.raw.contains("Signal 11", true)
+                currentFilterLevel.contains("ERROR") -> entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL || entry.raw.contains("failed", true)
+                currentFilterLevel.contains("WARN") -> entry.level == LogLevel.WARN || entry.level == LogLevel.ERROR || entry.level == LogLevel.FATAL || entry.raw.contains("denied", true)
+                currentFilterLevel.contains("INFO") -> entry.level != LogLevel.DEBUG && entry.level != LogLevel.VERBOSE
                 else -> true
             }
 

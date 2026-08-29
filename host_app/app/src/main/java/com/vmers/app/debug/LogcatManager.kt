@@ -1,11 +1,11 @@
 package com.vmers.app.debug
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileReader
+import java.io.FileWriter
 import java.io.InputStreamReader
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -26,34 +26,97 @@ data class LogEntry(
 )
 
 object LogcatManager {
-    private const val TAG = "Vmers-Logcat"
-    private const val MAX_LOGS = 5000
-
+    private const val TAG = "Vmers-Logger"
+    private const val LOG_FILE_NAME = "vmers_persistent_history.log"
     private val logs = CopyOnWriteArrayList<LogEntry>()
     private val listeners = CopyOnWriteArrayList<(LogEntry) -> Unit>()
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private var appContext: Context? = null
+    private val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US)
+    private val fileLock = Any()
 
     @Volatile
     private var isCapturing = false
 
-    private val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US)
+    fun init(context: Context) {
+        appContext = context.applicationContext
+        loadLogsFromDisk()
+    }
 
-    fun startLogCapture(context: Context) {
+    private fun getLogFile(): File? {
+        val ctx = appContext ?: return null
+        val logDir = File(ctx.filesDir, "logs")
+        if (!logDir.exists()) logDir.mkdirs()
+        return File(logDir, LOG_FILE_NAME)
+    }
+
+    private fun loadLogsFromDisk() {
+        val file = getLogFile() ?: return
+        if (!file.exists()) return
+
+        try {
+            BufferedReader(FileReader(file)).use { reader ->
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    val l = line ?: continue
+                    parseRawLine(l)?.let { logs.add(it) }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load logs from disk: ${e.message}")
+        }
+    }
+
+    private fun parseRawLine(line: String): LogEntry? {
+        // Expected format: [timestamp][LEVEL][TAG] message
+        return try {
+            if (line.startsWith("[")) {
+                val parts = line.split("]", limit = 4)
+                if (parts.size >= 4) {
+                    val time = parts[0].removePrefix("[")
+                    val levelStr = parts[1].removePrefix("[")
+                    val tag = parts[2].removePrefix("[")
+                    val msg = parts[3].trim()
+                    val level = try { LogLevel.valueOf(levelStr) } catch (e: Exception) { LogLevel.INFO }
+                    return LogEntry(time, level, tag, msg, line)
+                }
+            }
+            LogEntry(dateFormat.format(Date()), LogLevel.INFO, "LOG", line, line)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun writeToDisk(entry: LogEntry) {
+        synchronized(fileLock) {
+            val file = getLogFile() ?: return
+            try {
+                FileWriter(file, true).use { writer ->
+                    writer.write("[${entry.timestamp}][${entry.level}][${entry.tag}] ${entry.message}\n")
+                    writer.flush()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed writing to log file: ${e.message}")
+            }
+        }
+    }
+
+    fun startSystemLogCapture(context: Context) {
         if (isCapturing) return
         isCapturing = true
 
-        // Capture system logcat in background thread
-        thread(name = "LogcatCollector", isDaemon = true) {
+        thread(name = "Vmers-SysLog", isDaemon = true) {
             try {
-                val process = Runtime.getRuntime().exec("logcat -v time *:V")
+                val process = Runtime.getRuntime().exec("logcat -v time *:W")
                 val reader = BufferedReader(InputStreamReader(process.inputStream))
                 var line: String? = null
                 while (isCapturing && reader.readLine().also { line = it } != null) {
-                    line?.let { parseAndAddLog("SYS", it) }
+                    line?.let { raw ->
+                        if (raw.contains("SIGSEGV", true) || raw.contains("Signal 11", true) || raw.contains("denied", true) || raw.contains("FATAL", true)) {
+                            parseAndRecord("SYSTEM", raw)
+                        }
+                    }
                 }
-            } catch (e: Exception) {
-                logError(TAG, "Logcat capture failed: ${e.message}")
-            }
+            } catch (ignored: Exception) {}
         }
     }
 
@@ -71,67 +134,61 @@ object LogcatManager {
             message = line,
             raw = "[CONTAINER] $line"
         )
-        addEntry(entry)
+        addAndPersist(entry)
     }
 
     fun logInfo(tag: String, msg: String) {
         val entry = LogEntry(dateFormat.format(Date()), LogLevel.INFO, tag, msg, "[$tag] $msg")
-        addEntry(entry)
+        addAndPersist(entry)
         Log.i(tag, msg)
     }
 
     fun logWarn(tag: String, msg: String) {
         val entry = LogEntry(dateFormat.format(Date()), LogLevel.WARN, tag, msg, "[$tag] $msg")
-        addEntry(entry)
+        addAndPersist(entry)
         Log.w(tag, msg)
     }
 
     fun logError(tag: String, msg: String, tr: Throwable? = null) {
         val fullMsg = if (tr != null) "$msg\n${Log.getStackTraceString(tr)}" else msg
         val entry = LogEntry(dateFormat.format(Date()), LogLevel.ERROR, tag, fullMsg, "[$tag] $fullMsg")
-        addEntry(entry)
+        addAndPersist(entry)
         Log.e(tag, fullMsg, tr)
     }
 
     fun logFatal(tag: String, msg: String) {
         val entry = LogEntry(dateFormat.format(Date()), LogLevel.FATAL, tag, msg, "[FATAL][$tag] $msg")
-        addEntry(entry)
+        addAndPersist(entry)
         Log.e(tag, "FATAL CRASH: $msg")
     }
 
-    private fun parseAndAddLog(source: String, rawLine: String) {
+    private fun parseAndRecord(source: String, rawLine: String) {
         val level = when {
-            rawLine.contains(" F ") || rawLine.contains("SIGSEGV") || rawLine.contains("Signal 11") || rawLine.contains("backtrace:") -> LogLevel.FATAL
-            rawLine.contains(" E ") || rawLine.contains("denied") || rawLine.contains("Fatal") -> LogLevel.ERROR
-            rawLine.contains(" W ") || rawLine.contains("avc:") -> LogLevel.WARN
-            rawLine.contains(" I ") -> LogLevel.INFO
-            rawLine.contains(" D ") -> LogLevel.DEBUG
-            else -> LogLevel.VERBOSE
+            rawLine.contains(" F ") || rawLine.contains("SIGSEGV") || rawLine.contains("Signal 11") -> LogLevel.FATAL
+            rawLine.contains(" E ") || rawLine.contains("denied") -> LogLevel.ERROR
+            else -> LogLevel.WARN
         }
-
-        val entry = LogEntry(
-            timestamp = dateFormat.format(Date()),
-            level = level,
-            tag = source,
-            message = rawLine,
-            raw = rawLine
-        )
-        addEntry(entry)
+        val entry = LogEntry(dateFormat.format(Date()), level, source, rawLine, rawLine)
+        addAndPersist(entry)
     }
 
-    private fun addEntry(entry: LogEntry) {
-        if (logs.size >= MAX_LOGS) {
-            logs.removeAt(0)
-        }
+    private fun addAndPersist(entry: LogEntry) {
         logs.add(entry)
-        mainHandler.post {
-            for (listener in listeners) {
-                listener.invoke(entry)
-            }
+        writeToDisk(entry)
+        for (listener in listeners) {
+            listener.invoke(entry)
         }
     }
 
     fun getLogs(): List<LogEntry> = logs.toList()
+
+    fun getAllLogsText(): String {
+        val sb = StringBuilder()
+        for (entry in logs) {
+            sb.append("[${entry.timestamp}][${entry.level}][${entry.tag}] ${entry.message}\n")
+        }
+        return sb.toString()
+    }
 
     fun addListener(listener: (LogEntry) -> Unit) {
         listeners.add(listener)
@@ -143,18 +200,18 @@ object LogcatManager {
 
     fun clearLogs() {
         logs.clear()
-    }
-
-    fun exportLogsToFile(context: Context): File {
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val logFile = File(context.getExternalFilesDir(null) ?: context.filesDir, "vmers_crash_log_$timeStamp.txt")
-        logFile.bufferedWriter().use { out ->
-            out.write("================ VMERS SYSTEM & CONTAINER LOGCAT DUMP ================\n")
-            out.write("Generated at: ${Date()}\n\n")
-            for (entry in logs) {
-                out.write("[${entry.timestamp}][${entry.level}][${entry.tag}] ${entry.message}\n")
+        synchronized(fileLock) {
+            val file = getLogFile()
+            if (file != null && file.exists()) {
+                file.writeText("")
             }
         }
-        return logFile
+    }
+
+    fun getExportFile(context: Context): File {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val exportFile = File(context.getExternalFilesDir(null) ?: context.filesDir, "vmers_crash_dump_$timeStamp.txt")
+        exportFile.writeText(getAllLogsText())
+        return exportFile
     }
 }

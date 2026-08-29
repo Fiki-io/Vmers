@@ -81,7 +81,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleImportRomUri(uri: Uri) {
         val dialog = ProgressDialog(this).apply {
-            setMessage("Mengekstrak dan memasang ROM Android 15 ke container...")
+            setTitle("Memasang ROM Android 15")
+            setMessage("Menyiapkan berkas ROM...")
             setCancelable(false)
             show()
         }
@@ -90,29 +91,36 @@ class MainActivity : AppCompatActivity() {
             try {
                 val vm = VMManager.getInstance()
                 if (vm != null) {
-                    val tempArchive = File(cacheDir, "rom_temp.7z")
+                    val tempArchive = File(cacheDir, "rom_import.tmp")
+                    runOnUiThread { dialog.setMessage("Menyalin berkas ROM dari penyimpanan...") }
+                    
                     contentResolver.openInputStream(uri)?.use { input ->
                         FileOutputStream(tempArchive).use { output ->
                             input.copyTo(output)
                         }
                     }
 
-                    // Extract using 7z command or unzip
-                    val pb = ProcessBuilder("7z", "x", "-y", tempArchive.absolutePath, "-o${vm.rootfsDir.absolutePath}")
-                    val p = pb.start()
-                    p.waitFor()
+                    val success = com.vmers.app.core.ArchiveExtractor.extractArchive(tempArchive, vm.rootfsDir) { _, status ->
+                        runOnUiThread { dialog.setMessage("Mengekstrak berkas sistem...\n$status") }
+                    }
 
                     tempArchive.delete()
                     runOnUiThread {
                         dialog.dismiss()
-                        Toast.makeText(this, "ROM Android 15 Berhasil Dipasang!", Toast.LENGTH_SHORT).show()
+                        if (success) {
+                            Toast.makeText(this, "ROM Android 15 Berhasil Dipasang!", Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(this, "Gagal mengekstrak ROM. Periksa log debugger.", Toast.LENGTH_LONG).show()
+                        }
                         updateUI()
                     }
                 }
             } catch (e: Exception) {
+                com.vmers.app.debug.LogcatManager.logError("MainActivity", "Import ROM exception: ${e.message}", e)
                 runOnUiThread {
                     dialog.dismiss()
                     Toast.makeText(this, "Gagal memasang ROM: ${e.message}", Toast.LENGTH_LONG).show()
+                    updateUI()
                 }
             }
         }

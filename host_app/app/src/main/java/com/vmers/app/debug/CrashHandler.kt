@@ -13,11 +13,11 @@ class CrashHandler private constructor(private val context: Context) : Thread.Un
 
     override fun uncaughtException(t: Thread, e: Throwable) {
         val stackTrace = Log.getStackTraceString(e)
-        LogcatManager.logFatal("CRASH_HANDLER", "Uncaught Exception on Thread ${t.name} (id: ${t.id}): ${e.message}\n$stackTrace")
+        LogcatManager.logFatal("CRASH_HANDLER", "FATAL UNCAUGHT CRASH on Thread ${t.name} (id: ${t.id}): ${e.message}\n$stackTrace")
         
         try {
-            val file = LogcatManager.exportLogsToFile(context)
-            Log.e("Vmers-Crash", "Crash log exported to ${file.absolutePath}")
+            val file = LogcatManager.getExportFile(context)
+            Log.e("Vmers-Crash", "Emergency crash log written to ${file.absolutePath}")
         } catch (ignored: Exception) {
         }
 
@@ -26,8 +26,9 @@ class CrashHandler private constructor(private val context: Context) : Thread.Un
 
     companion object {
         fun init(context: Context) {
+            LogcatManager.init(context)
             CrashHandler(context)
-            LogcatManager.startLogCapture(context)
+            LogcatManager.startSystemLogCapture(context)
         }
     }
 }
