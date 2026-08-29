@@ -32,14 +32,11 @@ jobs:
           make arm64 host
           ls -lh vmers_engine_arm64 libvmlink_shim_arm64.so
 
-      - name: Bundle Native Binaries to App jniLibs & Assets
+      - name: Bundle Native Binaries to App Assets
         run: |
           mkdir -p host_app/app/src/main/assets/bin
-          mkdir -p host_app/app/src/main/jniLibs/arm64-v8a
           cp core_engine/vmers_engine_arm64 host_app/app/src/main/assets/bin/vmers_engine
           cp core_engine/libvmlink_shim_arm64.so host_app/app/src/main/assets/bin/libvmlink_shim.so
-          cp core_engine/vmers_engine_arm64 host_app/app/src/main/jniLibs/arm64-v8a/libvmers_engine.so
-          cp core_engine/libvmlink_shim_arm64.so host_app/app/src/main/jniLibs/arm64-v8a/libvmlink_shim.so
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1

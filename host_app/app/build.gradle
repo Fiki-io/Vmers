@@ -61,6 +61,7 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging = true
+            pickFirsts += ['**/libvmers_engine.so', '**/libvmlink_shim.so', '**/libvmers_jni.so']
         }
     }
 
