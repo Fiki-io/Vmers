@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark"
+    android:padding="24dp">
+
+    <!-- Header Section -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Vmers"
+        android:textColor="@color/text_white"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:layout_marginTop="20dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Universal Android 15 Virtual Machine Engine"
+        android:textColor="@color/text_muted"
+        android:textSize="14sp"
+        android:layout_marginBottom="32dp" />
+
+    <!-- VM Card -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@color/card_dark"
+        android:padding="20dp"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Primary Instance (vm0)"
+            android:textColor="@color/text_white"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="OS: AOSP Android 15 (ARM64-v8a) Vanilla"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp" />
+
+        <TextView
+            android:id="@+id/tv_vm_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Status: Offline"
+            android:textColor="@color/text_muted"
+            android:textSize="14sp"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btn_boot_vm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Boot Android 15"
+            android:backgroundTint="@color/primary"
+            android:textColor="@color/text_white"
+            android:layout_marginTop="16dp" />
+
+    </LinearLayout>
+
+    <!-- Controls -->
+    <Button
+        android:id="@+id/btn_vm_settings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="VM Settings &amp; Device Identity"
+        android:backgroundTint="@color/card_dark"
+        android:textColor="@color/text_white"
+        android:layout_marginBottom="12dp" />
+
+</LinearLayout>

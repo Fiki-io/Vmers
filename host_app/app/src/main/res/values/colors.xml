@@ -1,0 +1,10 @@
+<resources>
+    <color name="primary">#6C5CE7</color>
+    <color name="primary_dark">#4834D4</color>
+    <color name="accent">#00CEC9</color>
+    <color name="bg_dark">#131418</color>
+    <color name="card_dark">#1E2026</color>
+    <color name="text_white">#F5F6FA</color>
+    <color name="text_muted">#A4B0BE</color>
+    <color name="status_green">#2ED573</color>
+</resources>

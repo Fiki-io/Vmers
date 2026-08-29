@@ -1,0 +1,17 @@
+*.o
+*.a
+*.so
+*.7z
+*.zip
+*.apk
+*.img
+*.orig
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+rom_tools/work/
+roms/*.img
+roms/*.7z

@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# Set default location for Gradle installation
+DIRNAME=`dirname "$0"`
+APP_BASE_NAME=`basename "$0"`
+APP_HOME=`cd "$DIRNAME" && pwd`
+
+# Use default java
+if [ -n "$JAVA_HOME" ] ; then
+    JAVACMD="$JAVA_HOME/bin/java"
+else
+    JAVACMD="java"
+fi
+
+# Download gradle wrapper jar if needed or invoke gradle
+exec gradle "$@"

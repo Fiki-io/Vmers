@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Vmers</string>
+    <string name="app_desc">Universal Android-in-Android Container Virtual Machine</string>
+</resources>
