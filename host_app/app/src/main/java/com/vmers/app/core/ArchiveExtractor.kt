@@ -24,13 +24,16 @@ object ArchiveExtractor {
         return try {
             val name = archiveFile.name.lowercase()
             val success = when {
-                name.endsWith(".7z") -> extract7z(archiveFile, targetDir, onProgress)
                 name.endsWith(".zip") -> extractZip(archiveFile, targetDir, onProgress)
-                else -> {
-                    // Try 7z first, then zip
-                    if (!extract7z(archiveFile, targetDir, onProgress)) {
+                name.endsWith(".7z") -> {
+                    val ok7z = extract7z(archiveFile, targetDir, onProgress)
+                    if (!ok7z) {
+                        LogcatManager.logWarn(TAG, "7z decompression failed, attempting ZIP fallback...")
                         extractZip(archiveFile, targetDir, onProgress)
                     } else true
+                }
+                else -> {
+                    extractZip(archiveFile, targetDir, onProgress) || extract7z(archiveFile, targetDir, onProgress)
                 }
             }
 

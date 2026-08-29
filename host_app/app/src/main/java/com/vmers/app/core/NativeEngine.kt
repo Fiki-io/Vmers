@@ -13,6 +13,8 @@ object NativeEngine {
     }
 
     external fun initVMEnvironment(rootfsPath: String, width: Int, height: Int, dpi: Int): Boolean
+    external fun startContainerNative(rootfsPath: String, width: Int, height: Int, dpi: Int, enableRoot: Boolean): Boolean
+    external fun stopContainerNative()
     external fun setSurface(surface: Surface?)
     external fun sendTouchEvent(action: Int, x: Int, y: Int, pointerId: Int)
     external fun chmodRecursively(targetPath: String, mode: Int): Int

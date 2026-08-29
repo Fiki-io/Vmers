@@ -1,7 +1,6 @@
 package com.vmers.app.core
 
 import android.content.Context
-import android.util.Log
 import com.vmers.app.debug.LogcatManager
 import java.io.File
 import java.io.FileOutputStream
@@ -65,15 +64,28 @@ class VMInstance(
 
         LogcatManager.logInfo(TAG, "Starting VM Instance ${config.id}...")
         
-        // Initialize JNI native environment
-        NativeEngine.initVMEnvironment(
-            rootfsDir.absolutePath,
-            config.width,
-            config.height,
-            config.dpi
-        )
+        // 1. Primary Strategy: Launch in-process native Zygote container via JNI
+        try {
+            LogcatManager.logInfo(TAG, "Launching container via Native JNI Engine...")
+            val jniSuccess = NativeEngine.startContainerNative(
+                rootfsDir.absolutePath,
+                config.width,
+                config.height,
+                config.dpi,
+                config.enableRoot
+            )
+            if (jniSuccess) {
+                isRunning = true
+                LogcatManager.logInfo(TAG, "VM Instance ${config.id} successfully booted via Native JNI Engine!")
+                return true
+            } else {
+                LogcatManager.logWarn(TAG, "Native JNI Engine returned false, falling back to process launcher...")
+            }
+        } catch (e: Exception) {
+            LogcatManager.logWarn(TAG, "Native JNI launch exception: ${e.message}, falling back...")
+        }
 
-        // 1. Locate engine binary and shim library (Prefer nativeLibraryDir for Android 10+ W^X compliance)
+        // 2. Secondary Strategy: Bionic Linker & Subprocess Launcher
         val nativeLibDir = File(context.applicationInfo.nativeLibraryDir)
         val libEngine = File(nativeLibDir, "libvmers_engine.so")
         val libShim = File(nativeLibDir, "libvmlink_shim.so")
@@ -94,9 +106,6 @@ class VMInstance(
             else -> null
         }
 
-        LogcatManager.logInfo(TAG, "Resolved Engine Binary: $enginePath (Shim: $shimPath)")
-
-        // 2. Build command line with fallback strategies
         val commandCandidates = listOf(
             listOf(enginePath, rootfsDir.absolutePath),
             listOf("/system/bin/linker64", enginePath, rootfsDir.absolutePath),
@@ -112,7 +121,6 @@ class VMInstance(
                 pb.directory(rootfsDir)
                 pb.redirectErrorStream(true)
                 
-                // Environment variables for guest container isolation
                 val env = pb.environment()
                 env["VMERS_ROOTFS"] = rootfsDir.absolutePath
                 if (shimPath != null) {
@@ -128,7 +136,6 @@ class VMInstance(
                 isRunning = true
                 LogcatManager.logInfo(TAG, "VM Instance ${config.id} booted successfully with: ${cmd[0]}")
 
-                // Stream container stdout/stderr to LogcatManager
                 kotlin.concurrent.thread(name = "VM-Log-Reader", isDaemon = true) {
                     try {
                         val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
@@ -154,6 +161,9 @@ class VMInstance(
 
     fun stopVM() {
         LogcatManager.logInfo(TAG, "Stopping VM Instance ${config.id}...")
+        try {
+            NativeEngine.stopContainerNative()
+        } catch (ignored: Exception) {}
         vmProcess?.destroy()
         vmProcess = null
         isRunning = false
