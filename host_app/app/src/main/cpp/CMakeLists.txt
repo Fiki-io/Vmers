@@ -18,6 +18,8 @@ add_library(
     vmers_jni
     SHARED
     native_bridge.cpp
+    ../../../../../core_engine/property_service.cpp
+    ../../../../../core_engine/vmlink_loader.cpp
 )
 
 target_include_directories(
